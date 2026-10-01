@@ -14,13 +14,16 @@ final class DecisionEngineTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->engine = new DecisionEngine(['approve_max' => 60.0, 'review_max' => 85.0]);
+        $this->engine = new DecisionEngine(
+            ['approve_max' => 60.0, 'review_max' => 85.0],
+            400000,
+        );
     }
 
     #[DataProvider('ltvValues')]
     public function testDecidesByLtv(float $ltv, string $expected): void
     {
-        self::assertSame($expected, $this->engine->decide($ltv));
+        self::assertSame($expected, $this->engine->decide($ltv, 96000));
     }
 
     /** @return array<string,array{float,string}> */
@@ -34,5 +37,32 @@ final class DecisionEngineTest extends TestCase
             'сразу за верхней границей' => [85.01, DecisionEngine::REJECT],
             'высокий LTV' => [120.0, DecisionEngine::REJECT],
         ];
+    }
+
+    #[DataProvider('mileageAtOrBelowThreshold')]
+    public function testKeepsLtvDecisionAtOrBelowMileageThreshold(
+        int $mileage,
+        float $ltv,
+        string $expected,
+    ): void {
+        self::assertSame($expected, $this->engine->decide($ltv, $mileage));
+    }
+
+    /** @return array<string,array{int,float,string}> */
+    public static function mileageAtOrBelowThreshold(): array
+    {
+        return [
+            '399999 км с approve LTV' => [399999, 50.0, DecisionEngine::APPROVE],
+            '399999 км с review LTV' => [399999, 75.0, DecisionEngine::REVIEW],
+            '399999 км с reject LTV' => [399999, 86.0, DecisionEngine::REJECT],
+            '400000 км с approve LTV' => [400000, 50.0, DecisionEngine::APPROVE],
+            '400000 км с review LTV' => [400000, 75.0, DecisionEngine::REVIEW],
+            '400000 км с reject LTV' => [400000, 86.0, DecisionEngine::REJECT],
+        ];
+    }
+
+    public function testSendsMileageAboveThresholdToReviewWhenLtvIsBelowReviewMaximum(): void
+    {
+        self::assertSame(DecisionEngine::REVIEW, $this->engine->decide(50.0, 400001));
     }
 }
