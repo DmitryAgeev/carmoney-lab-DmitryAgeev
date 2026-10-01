@@ -79,4 +79,14 @@ final class ApplicationValidatorTest extends TestCase
             );
         }
     }
+
+    public function testRejectsEmptyMileage(): void
+    {
+        try {
+            $this->validator->validate($this->validPayload(['mileage' => '']));
+            self::fail('Ожидали ValidationException');
+        } catch (ValidationException $exception) {
+            self::assertArrayHasKey('mileage', $exception->errors());
+        }
+    }
 }
